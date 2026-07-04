@@ -1,60 +1,42 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
 from PIL import Image
 import json
+import keras
 
-# ================= UI CONFIG =================
-st.set_page_config(
-    page_title="Shoe AI Classifier",
-    page_icon="👟",
-    layout="centered"
-)
+# ================= UI =================
+st.set_page_config(page_title="Shoe AI", layout="centered")
 
-# ================= HEADER =================
-st.markdown(
-    """
-    <h1 style='text-align:center; color:#4F8BF9;'>👟 Shoe AI Classifier</h1>
-    <p style='text-align:center;'>Upload ảnh giày và AI sẽ dự đoán loại giày</p>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("<h1 style='text-align:center;'>👟 Shoe AI Classifier</h1>", unsafe_allow_html=True)
 
 # ================= LOAD MODEL =================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("shoe_classifier.h5")
+    return keras.models.load_model("shoe_classifier.h5")
 
 model = load_model()
 
-# ================= LOAD LABELS =================
-with open("class_indices.json", "r") as f:
+# ================= LABELS =================
+with open("class_indices.json") as f:
     class_indices = json.load(f)
 
 labels = {v: k for k, v in class_indices.items()}
 
 # ================= UPLOAD =================
-file = st.file_uploader("📤 Upload ảnh giày", type=["jpg", "png", "jpeg"])
+file = st.file_uploader("Upload image", type=["jpg","png","jpeg"])
 
 if file:
-    col1, col2 = st.columns(2)
+    img = Image.open(file).convert("RGB")
+    st.image(img, caption="Uploaded Image")
 
-    with col1:
-        img = Image.open(file).convert("RGB")
-        st.image(img, caption="Ảnh đã upload", use_column_width=True)
+    img = img.resize((224,224))
+    img = np.array(img)/255.0
+    img = np.expand_dims(img, axis=0)
 
-    with col2:
-        st.info("🔍 Đang phân tích...")
+    pred = model.predict(img)
+    idx = np.argmax(pred)
+    conf = float(np.max(pred))*100
 
-        img_resized = img.resize((224, 224))
-        img_array = np.array(img_resized) / 255.0
-        img_array = np.expand_dims(img_array, axis=0)
-
-        pred = model.predict(img_array)
-        idx = np.argmax(pred)
-        confidence = float(np.max(pred)) * 100
-
-        st.success(f"👟 Dự đoán: {labels[idx]}")
-        st.write(f"📊 Confidence: {confidence:.2f}%")
-
-        st.progress(int(confidence))
+    st.success(f"Prediction: {labels[idx]}")
+    st.progress(int(conf))
+    st.write(f"Confidence: {conf:.2f}%")
